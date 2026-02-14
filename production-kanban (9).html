@@ -1,0 +1,1711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Production Kanban Board - Multi-Warehouse</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Warehouse Selection Screen */
+        .warehouse-selection {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 40px;
+        }
+
+        .warehouse-selection h1 {
+            color: white;
+            font-size: 3em;
+            margin-bottom: 60px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+
+        .warehouse-buttons {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .warehouse-btn {
+            background: white;
+            border: none;
+            border-radius: 20px;
+            padding: 60px 80px;
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+            cursor: pointer;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+            transition: all 0.3s;
+            min-width: 300px;
+            min-height: 200px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .warehouse-btn:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 12px 24px rgba(0,0,0,0.3);
+            background: #f8f9ff;
+        }
+
+        .warehouse-btn:active {
+            transform: translateY(-5px);
+        }
+
+        .warehouse-icon {
+            font-size: 1.5em;
+        }
+
+        /* Main Kanban Board */
+        .kanban-container {
+            display: none;
+            padding: 20px;
+        }
+
+        .kanban-container.active {
+            display: block;
+        }
+
+        .top-bar {
+            background: rgba(255,255,255,0.95);
+            padding: 20px 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .warehouse-title {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .top-bar-buttons {
+            display: flex;
+            gap: 15px;
+        }
+
+        .back-btn, .reports-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 1.2em;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .reports-btn {
+            background: #4caf50;
+        }
+
+        .back-btn:hover {
+            background: #5568d3;
+            transform: scale(1.05);
+        }
+
+        .reports-btn:hover {
+            background: #45a049;
+            transform: scale(1.05);
+        }
+
+        .back-btn:active, .reports-btn:active {
+            transform: scale(0.98);
+        }
+
+        .kanban-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 25px;
+            padding: 10px;
+        }
+
+        .machine-card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            transition: all 0.3s;
+        }
+
+        .machine-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+        }
+
+        .machine-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 3px solid #f0f0f0;
+        }
+
+        .machine-name {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .status-badge {
+            padding: 8px 16px;
+            border-radius: 25px;
+            font-size: 0.9em;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .status-idle {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .status-running {
+            background: #c8e6c9;
+            color: #388e3c;
+            animation: pulse 2s infinite;
+        }
+
+        .status-stopped {
+            background: #ffccbc;
+            color: #d84315;
+        }
+
+        .status-complete {
+            background: #f3e5f5;
+            color: #7b1fa2;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .machine-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            min-height: 120px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+
+        .info-label {
+            font-weight: bold;
+            color: #666;
+        }
+
+        .info-value {
+            color: #333;
+            font-weight: 600;
+        }
+
+        .stop-reason {
+            background: #fff3e0;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 10px;
+            border-left: 4px solid #ff9800;
+        }
+
+        .stop-reason-label {
+            font-weight: bold;
+            color: #e65100;
+            margin-bottom: 5px;
+        }
+
+        /* Form Elements */
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #555;
+            font-size: 1.1em;
+        }
+
+        .form-input,
+        .form-select {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1.1em;
+            transition: all 0.3s;
+            background: white;
+        }
+
+        .form-input:focus,
+        .form-select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        /* Buttons */
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 18px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.2em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+        }
+
+        .btn-start {
+            background: linear-gradient(135deg, #4caf50, #45a049);
+            color: white;
+        }
+
+        .btn-start:hover {
+            background: linear-gradient(135deg, #45a049, #3d8b40);
+        }
+
+        .btn-stop {
+            background: linear-gradient(135deg, #f44336, #e53935);
+            color: white;
+        }
+
+        .btn-stop:hover {
+            background: linear-gradient(135deg, #e53935, #d32f2f);
+        }
+
+        .btn-resume {
+            background: linear-gradient(135deg, #ff9800, #fb8c00);
+            color: white;
+        }
+
+        .btn-resume:hover {
+            background: linear-gradient(135deg, #fb8c00, #f57c00);
+        }
+
+        .btn-complete {
+            background: linear-gradient(135deg, #9c27b0, #8e24aa);
+            color: white;
+        }
+
+        .btn-complete:hover {
+            background: linear-gradient(135deg, #8e24aa, #7b1fa2);
+        }
+
+        .btn-cancel {
+            background: #9e9e9e;
+            color: white;
+        }
+
+        .btn-cancel:hover {
+            background: #757575;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 500px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        .modal-header {
+            font-size: 1.8em;
+            font-weight: bold;
+            margin-bottom: 25px;
+            color: #333;
+            text-align: center;
+        }
+
+        /* Timer */
+        .timer {
+            background: #e8eaf6;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #3f51b5;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .kanban-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .warehouse-btn {
+                min-width: 250px;
+                padding: 40px 60px;
+            }
+
+            .warehouse-title {
+                font-size: 2em;
+            }
+            
+            .warehouse-selection h1 {
+                font-size: 2em;
+            }
+        }
+
+        /* Reports Page Styles */
+        .reports-container {
+            display: none;
+            padding: 20px;
+        }
+
+        .reports-container.active {
+            display: block;
+        }
+
+        .reports-header {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .reports-title {
+            font-size: 2em;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .reports-actions {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .btn-export {
+            background: #4caf50;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-size: 1.1em;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .btn-export:hover {
+            background: #45a049;
+        }
+
+        .btn-clear {
+            background: #f44336;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-size: 1.1em;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .btn-clear:hover {
+            background: #e53935;
+        }
+
+        .data-table-container {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            overflow-x: auto;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 1em;
+        }
+
+        .data-table th {
+            background: #667eea;
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-weight: bold;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .data-table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .data-table tr:hover {
+            background: #f5f5f5;
+        }
+
+        .status-cell {
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .status-cell.idle {
+            color: #1976d2;
+        }
+
+        .status-cell.running {
+            color: #388e3c;
+        }
+
+        .status-cell.stopped {
+            color: #d84315;
+        }
+
+        .status-cell.complete {
+            color: #7b1fa2;
+        }
+
+        .status-cell.completed {
+            color: #7b1fa2;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+            font-size: 1.2em;
+        }
+
+        .filter-section {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .filter-label {
+            font-weight: bold;
+            color: #555;
+        }
+
+        .filter-select {
+            padding: 10px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+            background: white;
+        }
+    </style>
+</head>
+<body>
+    <!-- Warehouse Selection Screen -->
+    <div id="warehouseSelection" class="warehouse-selection">
+        <h1>🏭 Select Your Warehouse</h1>
+        <div class="warehouse-buttons">
+            <button class="warehouse-btn" onclick="selectWarehouse(1)">
+                <div class="warehouse-icon">🏢</div>
+                <div>Warehouse 1</div>
+            </button>
+            <button class="warehouse-btn" onclick="selectWarehouse(2)">
+                <div class="warehouse-icon">🏢</div>
+                <div>Warehouse 2</div>
+            </button>
+            <button class="warehouse-btn" onclick="selectWarehouse(3)">
+                <div class="warehouse-icon">🏢</div>
+                <div>Warehouse 3</div>
+            </button>
+        </div>
+    </div>
+
+    <!-- Kanban Board for Warehouse 1 -->
+    <div id="warehouse1" class="kanban-container">
+        <div class="top-bar">
+            <div class="warehouse-title">🏢 Warehouse 1 - Production Dashboard</div>
+            <div class="top-bar-buttons">
+                <button class="reports-btn" onclick="showReports(1)">📊 View Reports</button>
+                <button class="back-btn" onclick="backToSelection()">← Back</button>
+            </div>
+        </div>
+        <div id="kanban-grid-1" class="kanban-grid"></div>
+    </div>
+
+    <!-- Kanban Board for Warehouse 2 -->
+    <div id="warehouse2" class="kanban-container">
+        <div class="top-bar">
+            <div class="warehouse-title">🏢 Warehouse 2 - Production Dashboard</div>
+            <div class="top-bar-buttons">
+                <button class="reports-btn" onclick="showReports(2)">📊 View Reports</button>
+                <button class="back-btn" onclick="backToSelection()">← Back</button>
+            </div>
+        </div>
+        <div id="kanban-grid-2" class="kanban-grid"></div>
+    </div>
+
+    <!-- Kanban Board for Warehouse 3 -->
+    <div id="warehouse3" class="kanban-container">
+        <div class="top-bar">
+            <div class="warehouse-title">🏢 Warehouse 3 - Production Dashboard</div>
+            <div class="top-bar-buttons">
+                <button class="reports-btn" onclick="showReports(3)">📊 View Reports</button>
+                <button class="back-btn" onclick="backToSelection()">← Back</button>
+            </div>
+        </div>
+        <div id="kanban-grid-3" class="kanban-grid"></div>
+    </div>
+
+    <!-- Modal for Start Production -->
+    <div id="startModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">Start Production</div>
+            <div class="form-group">
+                <label class="form-label">Select Item Type:</label>
+                <select id="itemTypeSelect" class="form-select">
+                    <option value="">-- Select Type --</option>
+                    <option value="HDPE Corrugated Micro Duct">HDPE Corrugated Micro Duct</option>
+                    <option value="PVC Corrugated Micro Duct">PVC Corrugated Micro Duct</option>
+                    <option value="HDPE Plain Pipe">HDPE Plain Pipe</option>
+                    <option value="PVC Plain Pipe">PVC Plain Pipe</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Select Color:</label>
+                <select id="colorSelect" class="form-select">
+                    <option value="">-- Select Color --</option>
+                    <option value="Black">Black</option>
+                    <option value="White">White</option>
+                    <option value="Red">Red</option>
+                    <option value="Blue">Blue</option>
+                    <option value="Yellow">Yellow</option>
+                    <option value="Green">Green</option>
+                    <option value="Orange">Orange</option>
+                    <option value="Brown">Brown</option>
+                    <option value="Grey">Grey</option>
+                    <option value="Purple">Purple</option>
+                    <option value="Pink">Pink</option>
+                    <option value="Light Blue">Light Blue</option>
+                    <option value="Dark Blue">Dark Blue</option>
+                    <option value="Light Green">Light Green</option>
+                    <option value="Dark Green">Dark Green</option>
+                    <option value="Violet">Violet</option>
+                    <option value="Beige">Beige</option>
+                    <option value="Cream">Cream</option>
+                    <option value="Transparent">Transparent</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Quantity (in Meters):</label>
+                <input type="number" id="quantityInput" class="form-input" placeholder="Enter quantity in meters" min="1" step="0.1">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Outer Diameter (OD):</label>
+                <select id="sizeSelect" class="form-select">
+                    <option value="">-- Select OD Size --</option>
+                    <option value="5 MM">5 MM</option>
+                    <option value="6 MM">6 MM</option>
+                    <option value="7 MM">7 MM</option>
+                    <option value="8 MM">8 MM</option>
+                    <option value="10 MM">10 MM</option>
+                    <option value="12 MM">12 MM</option>
+                    <option value="14 MM">14 MM</option>
+                    <option value="16 MM">16 MM</option>
+                    <option value="18 MM">18 MM</option>
+                    <option value="20 MM">20 MM</option>
+                    <option value="25 MM">25 MM</option>
+                    <option value="28 MM">28 MM</option>
+                    <option value="32 MM">32 MM</option>
+                    <option value="34 MM">34 MM</option>
+                    <option value="40 MM">40 MM</option>
+                    <option value="50 MM">50 MM</option>
+                    <option value="63 MM">63 MM</option>
+                    <option value="75 MM">75 MM</option>
+                    <option value="90 MM">90 MM</option>
+                    <option value="110 MM">110 MM</option>
+                    <option value="125 MM">125 MM</option>
+                    <option value="140 MM">140 MM</option>
+                    <option value="160 MM">160 MM</option>
+                    <option value="180 MM">180 MM</option>
+                    <option value="200 MM">200 MM</option>
+                </select>
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-cancel" onclick="closeModal()">Cancel</button>
+                <button class="btn btn-start" onclick="confirmStart()">Start Production</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Stop Reason -->
+    <div id="stopModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">Select Stop Reason</div>
+            <div class="form-group">
+                <label class="form-label">Reason for Stopping:</label>
+                <select id="stopReasonSelect" class="form-select">
+                    <option value="">-- Select Reason --</option>
+                    <option value="Machine Issue">Machine Issue</option>
+                    <option value="Material Issue">Material Issue</option>
+                    <option value="Quality Issue">Quality Issue</option>
+                    <option value="Break Time">Break Time</option>
+                    <option value="Maintenance">Maintenance</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+            <div class="form-group" id="otherReasonGroup" style="display: none;">
+                <label class="form-label">Specify Other Reason:</label>
+                <input type="text" id="otherReasonInput" class="form-input" placeholder="Enter reason">
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-cancel" onclick="closeModal()">Cancel</button>
+                <button class="btn btn-stop" onclick="confirmStop()">Confirm Stop</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reports Page for Warehouse 1 -->
+    <div id="reports1" class="reports-container">
+        <div class="reports-header">
+            <div class="reports-title">📊 Warehouse 1 - Production Reports</div>
+            <div class="reports-actions">
+                <button class="btn-export" onclick="exportToExcel(1)">📥 Export to Excel</button>
+                <button class="btn-clear" onclick="confirmClearData(1)">🗑️ Clear All Data</button>
+                <button class="back-btn" onclick="backToKanban(1)">← Back to Dashboard</button>
+            </div>
+        </div>
+        <div class="data-table-container">
+            <div class="filter-section">
+                <span class="filter-label">Filter by Status:</span>
+                <select class="filter-select" id="filterStatus1" onchange="filterReports(1)">
+                    <option value="all">All Status</option>
+                    <option value="running">Running</option>
+                    <option value="stopped">Stopped</option>
+                    <option value="completed">Completed</option>
+                </select>
+            </div>
+            <table class="data-table" id="dataTable1">
+                <thead>
+                    <tr>
+                        <th>Warehouse</th>
+                        <th>Machine</th>
+                        <th>Status</th>
+                        <th>Product Type</th>
+                        <th>Color</th>
+                        <th>Size (OD)</th>
+                        <th>Quantity</th>
+                        <th>Start Date</th>
+                        <th>Production Time</th>
+                        <th>Stop Duration</th>
+                        <th>Stop Reason</th>
+                        <th>Completed At</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody1">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Reports Page for Warehouse 2 -->
+    <div id="reports2" class="reports-container">
+        <div class="reports-header">
+            <div class="reports-title">📊 Warehouse 2 - Production Reports</div>
+            <div class="reports-actions">
+                <button class="btn-export" onclick="exportToExcel(2)">📥 Export to Excel</button>
+                <button class="btn-clear" onclick="confirmClearData(2)">🗑️ Clear All Data</button>
+                <button class="back-btn" onclick="backToKanban(2)">← Back to Dashboard</button>
+            </div>
+        </div>
+        <div class="data-table-container">
+            <div class="filter-section">
+                <span class="filter-label">Filter by Status:</span>
+                <select class="filter-select" id="filterStatus2" onchange="filterReports(2)">
+                    <option value="all">All Status</option>
+                    <option value="running">Running</option>
+                    <option value="stopped">Stopped</option>
+                    <option value="completed">Completed</option>
+                </select>
+            </div>
+            <table class="data-table" id="dataTable2">
+                <thead>
+                    <tr>
+                        <th>Warehouse</th>
+                        <th>Machine</th>
+                        <th>Status</th>
+                        <th>Product Type</th>
+                        <th>Color</th>
+                        <th>Size (OD)</th>
+                        <th>Quantity</th>
+                        <th>Start Date</th>
+                        <th>Production Time</th>
+                        <th>Stop Duration</th>
+                        <th>Stop Reason</th>
+                        <th>Completed At</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody2">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Reports Page for Warehouse 3 -->
+    <div id="reports3" class="reports-container">
+        <div class="reports-header">
+            <div class="reports-title">📊 Warehouse 3 - Production Reports</div>
+            <div class="reports-actions">
+                <button class="btn-export" onclick="exportToExcel(3)">📥 Export to Excel</button>
+                <button class="btn-clear" onclick="confirmClearData(3)">🗑️ Clear All Data</button>
+                <button class="back-btn" onclick="backToKanban(3)">← Back to Dashboard</button>
+            </div>
+        </div>
+        <div class="data-table-container">
+            <div class="filter-section">
+                <span class="filter-label">Filter by Status:</span>
+                <select class="filter-select" id="filterStatus3" onchange="filterReports(3)">
+                    <option value="all">All Status</option>
+                    <option value="running">Running</option>
+                    <option value="stopped">Stopped</option>
+                    <option value="completed">Completed</option>
+                </select>
+            </div>
+            <table class="data-table" id="dataTable3">
+                <thead>
+                    <tr>
+                        <th>Warehouse</th>
+                        <th>Machine</th>
+                        <th>Status</th>
+                        <th>Product Type</th>
+                        <th>Color</th>
+                        <th>Size (OD)</th>
+                        <th>Quantity</th>
+                        <th>Start Date</th>
+                        <th>Production Time</th>
+                        <th>Stop Duration</th>
+                        <th>Stop Reason</th>
+                        <th>Completed At</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody3">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Data structure to hold machine states for all warehouses
+        const machines = {
+            1: [],
+            2: [],
+            3: []
+        };
+
+        // Production history to track all completed jobs
+        const productionHistory = {
+            1: [],
+            2: [],
+            3: []
+        };
+
+        let currentWarehouse = null;
+        let currentMachine = null;
+
+        // Initialize machines for all warehouses
+        function initializeMachines() {
+            for (let warehouse = 1; warehouse <= 3; warehouse++) {
+                for (let i = 1; i <= 20; i++) {
+                    machines[warehouse].push({
+                        id: i,
+                        warehouse: warehouse,
+                        name: `Machine ${i}`,
+                        status: 'idle', // idle, running, stopped, complete
+                        item: null,
+                        itemType: null,
+                        color: null,
+                        quantity: null,
+                        size: null,
+                        stopReason: null,
+                        startTime: null,
+                        actualStartTime: null,
+                        startDate: null, // Human readable start date
+                        savedElapsedTime: 0, // Accumulated time from stop/resume cycles
+                        stopTime: null,
+                        stopDate: null, // When machine was stopped
+                        stopDuration: 0, // How long machine was stopped
+                        timerInterval: null
+                    });
+                }
+            }
+        }
+
+        // Select warehouse
+        function selectWarehouse(warehouseNum) {
+            currentWarehouse = warehouseNum;
+            document.getElementById('warehouseSelection').style.display = 'none';
+            document.getElementById(`warehouse${warehouseNum}`).classList.add('active');
+            renderMachines(warehouseNum);
+            startAllTimers(warehouseNum);
+        }
+
+        // Back to warehouse selection
+        function backToSelection() {
+            stopAllTimers(currentWarehouse);
+            document.getElementById(`warehouse${currentWarehouse}`).classList.remove('active');
+            document.getElementById('warehouseSelection').style.display = 'flex';
+            currentWarehouse = null;
+        }
+
+        // Render machines for specific warehouse
+        function renderMachines(warehouseNum) {
+            const grid = document.getElementById(`kanban-grid-${warehouseNum}`);
+            grid.innerHTML = '';
+
+            machines[warehouseNum].forEach(machine => {
+                const card = createMachineCard(machine);
+                grid.appendChild(card);
+            });
+        }
+
+        // Create machine card
+        function createMachineCard(machine) {
+            const card = document.createElement('div');
+            card.className = 'machine-card';
+            card.innerHTML = `
+                <div class="machine-header">
+                    <div class="machine-name">${machine.name}</div>
+                    <div class="status-badge status-${machine.status}">${machine.status}</div>
+                </div>
+                <div class="machine-info">
+                    ${machine.status === 'idle' ? '<div style="text-align: center; color: #999; padding: 30px;">Ready to start production</div>' : ''}
+                    ${machine.status !== 'idle' ? `
+                        <div class="info-row">
+                            <span class="info-label">Product:</span>
+                            <span class="info-value" style="font-size: 0.95em;">${machine.item || '-'}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Quantity:</span>
+                            <span class="info-value">${machine.quantity || '-'}</span>
+                        </div>
+                        ${machine.startDate ? `
+                            <div class="info-row">
+                                <span class="info-label">Started:</span>
+                                <span class="info-value" style="font-size: 0.9em;">${machine.startDate}</span>
+                            </div>
+                        ` : ''}
+                        ${machine.status === 'running' || machine.status === 'stopped' ? `
+                            <div class="timer" id="timer-${machine.warehouse}-${machine.id}">00:00:00</div>
+                        ` : ''}
+                        ${machine.status === 'stopped' && machine.stopReason ? `
+                            <div class="stop-reason">
+                                <div class="stop-reason-label">⚠️ Stop Reason:</div>
+                                <div>${machine.stopReason}</div>
+                                ${machine.stopDate ? `<div style="font-size: 0.85em; margin-top: 5px;">Stopped at: ${machine.stopDate}</div>` : ''}
+                            </div>
+                        ` : ''}
+                    ` : ''}
+                </div>
+                <div class="btn-group">
+                    ${machine.status === 'idle' ? `
+                        <button class="btn btn-start" onclick="openStartModal(${machine.warehouse}, ${machine.id})">Start</button>
+                    ` : ''}
+                    ${machine.status === 'running' ? `
+                        <button class="btn btn-stop" onclick="openStopModal(${machine.warehouse}, ${machine.id})">Stop</button>
+                        <button class="btn btn-complete" onclick="completeMachine(${machine.warehouse}, ${machine.id})">Complete</button>
+                    ` : ''}
+                    ${machine.status === 'stopped' ? `
+                        <button class="btn btn-resume" onclick="resumeMachine(${machine.warehouse}, ${machine.id})">Resume</button>
+                        <button class="btn btn-complete" onclick="completeMachine(${machine.warehouse}, ${machine.id})">Complete</button>
+                    ` : ''}
+                    ${machine.status === 'complete' ? `
+                        <button class="btn btn-start" onclick="openStartModal(${machine.warehouse}, ${machine.id})">Start New Job</button>
+                    ` : ''}
+                </div>
+            `;
+            return card;
+        }
+
+        // Open start modal
+        function openStartModal(warehouse, machineId) {
+            currentMachine = { warehouse, machineId };
+            document.getElementById('itemTypeSelect').value = '';
+            document.getElementById('colorSelect').value = '';
+            document.getElementById('quantityInput').value = '';
+            document.getElementById('sizeSelect').value = '';
+            document.getElementById('startModal').classList.add('active');
+        }
+
+        // Confirm start
+        function confirmStart() {
+            const itemType = document.getElementById('itemTypeSelect').value;
+            const color = document.getElementById('colorSelect').value;
+            const quantity = document.getElementById('quantityInput').value;
+            const size = document.getElementById('sizeSelect').value;
+
+            if (!itemType || !color || !quantity || !size) {
+                alert('Please fill in all fields!');
+                return;
+            }
+
+            const item = `${itemType} - ${color} - ${size}`;
+
+            const machine = machines[currentMachine.warehouse][currentMachine.machineId - 1];
+            const now = Date.now();
+            
+            machine.status = 'running';
+            machine.item = item;
+            machine.itemType = itemType;
+            machine.color = color;
+            machine.quantity = quantity + ' M';
+            machine.size = size;
+            machine.stopReason = null;
+            machine.startTime = now; // Current session start
+            machine.actualStartTime = now; // Very first start time
+            machine.startDate = new Date(now).toLocaleString(); // Human readable start date
+            machine.savedElapsedTime = 0; // Time from previous stop/resume cycles
+            machine.stopTime = null;
+            machine.stopDate = null;
+            machine.stopDuration = 0;
+
+            // Immediately save to localStorage
+            saveWarehouseData(currentMachine.warehouse);
+
+            closeModal();
+            renderMachines(currentMachine.warehouse);
+            startTimer(currentMachine.warehouse, currentMachine.machineId);
+        }
+
+        // Open stop modal
+        function openStopModal(warehouse, machineId) {
+            currentMachine = { warehouse, machineId };
+            document.getElementById('stopReasonSelect').value = '';
+            document.getElementById('otherReasonInput').value = '';
+            document.getElementById('otherReasonGroup').style.display = 'none';
+            document.getElementById('stopModal').classList.add('active');
+        }
+
+        // Handle stop reason selection
+        document.getElementById('stopReasonSelect').addEventListener('change', function() {
+            const otherGroup = document.getElementById('otherReasonGroup');
+            if (this.value === 'Other') {
+                otherGroup.style.display = 'block';
+            } else {
+                otherGroup.style.display = 'none';
+            }
+        });
+
+        // Confirm stop
+        function confirmStop() {
+            const reason = document.getElementById('stopReasonSelect').value;
+            const otherReason = document.getElementById('otherReasonInput').value;
+
+            if (!reason) {
+                alert('Please select a reason!');
+                return;
+            }
+
+            if (reason === 'Other' && !otherReason) {
+                alert('Please specify the reason!');
+                return;
+            }
+
+            const machine = machines[currentMachine.warehouse][currentMachine.machineId - 1];
+            const now = Date.now();
+            
+            machine.status = 'stopped';
+            machine.stopReason = reason === 'Other' ? otherReason : reason;
+            machine.stopTime = now;
+            machine.stopDate = new Date(now).toLocaleString(); // Human readable stop date
+            
+            // Calculate and save the elapsed time including current session
+            const currentSessionTime = now - machine.startTime;
+            machine.savedElapsedTime = (machine.savedElapsedTime || 0) + currentSessionTime;
+            
+            stopTimer(currentMachine.warehouse, currentMachine.machineId);
+
+            // Immediately save to localStorage
+            saveWarehouseData(currentMachine.warehouse);
+
+            closeModal();
+            renderMachines(currentMachine.warehouse);
+        }
+
+        // Resume machine
+        function resumeMachine(warehouse, machineId) {
+            const machine = machines[warehouse][machineId - 1];
+            const now = Date.now();
+            
+            // Calculate stop duration
+            if (machine.stopTime) {
+                const currentStopDuration = now - machine.stopTime;
+                machine.stopDuration = (machine.stopDuration || 0) + currentStopDuration;
+            }
+            
+            machine.status = 'running';
+            machine.startTime = now; // New session start time
+            machine.stopReason = null; // Clear the stop reason when resuming
+            machine.stopDate = null; // Clear stop date
+            // Keep actualStartTime, savedElapsedTime, and stopDuration
+            
+            // Immediately save to localStorage
+            saveWarehouseData(warehouse);
+            
+            renderMachines(warehouse);
+            startTimer(warehouse, machineId);
+        }
+
+        // Complete machine
+        function completeMachine(warehouse, machineId) {
+            const machine = machines[warehouse][machineId - 1];
+            
+            if (confirm(`Complete production of ${machine.quantity} of ${machine.item}?`)) {
+                stopTimer(warehouse, machineId);
+                
+                // Calculate final production time
+                let finalProductionTime = '00:00:00';
+                if (machine.status === 'running') {
+                    const currentSessionTime = Date.now() - machine.startTime;
+                    const totalElapsed = (machine.savedElapsedTime || 0) + currentSessionTime;
+                    const hours = Math.floor(totalElapsed / 3600000);
+                    const minutes = Math.floor((totalElapsed % 3600000) / 60000);
+                    const seconds = Math.floor((totalElapsed % 60000) / 1000);
+                    finalProductionTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                }
+                
+                // Calculate final stop duration
+                let finalStopDuration = '-';
+                if (machine.stopDuration && machine.stopDuration > 0) {
+                    const hours = Math.floor(machine.stopDuration / 3600000);
+                    const minutes = Math.floor((machine.stopDuration % 3600000) / 60000);
+                    const seconds = Math.floor((machine.stopDuration % 60000) / 1000);
+                    finalStopDuration = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                }
+                
+                // Save to production history
+                const completedJob = {
+                    warehouse: warehouse,
+                    machine: machine.name,
+                    itemType: machine.itemType,
+                    color: machine.color,
+                    size: machine.size,
+                    item: machine.item,
+                    quantity: machine.quantity,
+                    startDate: machine.startDate,
+                    productionTime: finalProductionTime,
+                    stopDuration: finalStopDuration,
+                    completedAt: new Date().toLocaleString(),
+                    timestamp: Date.now()
+                };
+                
+                productionHistory[warehouse].push(completedJob);
+                
+                // Save production history to localStorage
+                localStorage.setItem(`productionHistory${warehouse}`, JSON.stringify(productionHistory[warehouse]));
+                
+                machine.status = 'complete';
+                
+                // Immediately save to localStorage
+                saveWarehouseData(warehouse);
+                
+                renderMachines(warehouse);
+                
+                // Auto reset after 3 seconds
+                setTimeout(() => {
+                    machine.status = 'idle';
+                    machine.item = null;
+                    machine.itemType = null;
+                    machine.color = null;
+                    machine.quantity = null;
+                    machine.size = null;
+                    machine.stopReason = null;
+                    machine.savedElapsedTime = 0;
+                    machine.startTime = null;
+                    machine.actualStartTime = null;
+                    machine.startDate = null;
+                    machine.stopTime = null;
+                    machine.stopDate = null;
+                    machine.stopDuration = 0;
+                    
+                    // Save after reset
+                    saveWarehouseData(warehouse);
+                    
+                    renderMachines(warehouse);
+                }, 3000);
+            }
+        }
+
+        // Close modal
+        function closeModal() {
+            document.getElementById('startModal').classList.remove('active');
+            document.getElementById('stopModal').classList.remove('active');
+        }
+
+        // Timer functions
+        function startTimer(warehouse, machineId) {
+            const machine = machines[warehouse][machineId - 1];
+            
+            machine.timerInterval = setInterval(() => {
+                // Total time = saved time from previous sessions + current session time
+                const currentSessionTime = Date.now() - machine.startTime;
+                const totalElapsed = (machine.savedElapsedTime || 0) + currentSessionTime;
+                updateTimerDisplay(warehouse, machineId, totalElapsed);
+            }, 1000);
+        }
+
+        function stopTimer(warehouse, machineId) {
+            const machine = machines[warehouse][machineId - 1];
+            if (machine.timerInterval) {
+                clearInterval(machine.timerInterval);
+                machine.timerInterval = null;
+            }
+        }
+
+        function updateTimerDisplay(warehouse, machineId, elapsed) {
+            const timerElement = document.getElementById(`timer-${warehouse}-${machineId}`);
+            if (timerElement) {
+                const hours = Math.floor(elapsed / 3600000);
+                const minutes = Math.floor((elapsed % 3600000) / 60000);
+                const seconds = Math.floor((elapsed % 60000) / 1000);
+                
+                timerElement.textContent = 
+                    `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }
+        }
+
+        function startAllTimers(warehouse) {
+            machines[warehouse].forEach(machine => {
+                if (machine.status === 'running') {
+                    startTimer(warehouse, machine.id);
+                }
+            });
+        }
+
+        function stopAllTimers(warehouse) {
+            machines[warehouse].forEach(machine => {
+                if (machine.timerInterval) {
+                    clearInterval(machine.timerInterval);
+                    machine.timerInterval = null;
+                }
+            });
+        }
+
+        // Initialize on load
+        initializeMachines();
+
+        // Show reports page
+        function showReports(warehouse) {
+            stopAllTimers(warehouse);
+            document.getElementById(`warehouse${warehouse}`).classList.remove('active');
+            document.getElementById(`reports${warehouse}`).classList.add('active');
+            updateReportsTable(warehouse);
+        }
+
+        // Back to kanban from reports
+        function backToKanban(warehouse) {
+            document.getElementById(`reports${warehouse}`).classList.remove('active');
+            document.getElementById(`warehouse${warehouse}`).classList.add('active');
+            startAllTimers(warehouse);
+        }
+
+        // Update reports table
+        function updateReportsTable(warehouse) {
+            const tbody = document.getElementById(`tableBody${warehouse}`);
+            const filterValue = document.getElementById(`filterStatus${warehouse}`).value;
+            tbody.innerHTML = '';
+
+            let allRecords = [];
+            
+            // Add current machine states (idle, running, stopped)
+            machines[warehouse].forEach(machine => {
+                if (machine.status !== 'idle') {
+                    let productionTime = '-';
+                    let stopDuration = '-';
+                    
+                    if (machine.status === 'running') {
+                        const currentSessionTime = Date.now() - machine.startTime;
+                        const totalElapsed = (machine.savedElapsedTime || 0) + currentSessionTime;
+                        const hours = Math.floor(totalElapsed / 3600000);
+                        const minutes = Math.floor((totalElapsed % 3600000) / 60000);
+                        const seconds = Math.floor((totalElapsed % 60000) / 1000);
+                        productionTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                    } else if (machine.status === 'stopped' && machine.savedElapsedTime) {
+                        const elapsed = machine.savedElapsedTime;
+                        const hours = Math.floor(elapsed / 3600000);
+                        const minutes = Math.floor((elapsed % 3600000) / 60000);
+                        const seconds = Math.floor((elapsed % 60000) / 1000);
+                        productionTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                        
+                        // Calculate current stop duration
+                        if (machine.stopTime) {
+                            const currentStopTime = Date.now() - machine.stopTime;
+                            const totalStopTime = (machine.stopDuration || 0) + currentStopTime;
+                            const stopHours = Math.floor(totalStopTime / 3600000);
+                            const stopMinutes = Math.floor((totalStopTime % 3600000) / 60000);
+                            const stopSeconds = Math.floor((totalStopTime % 60000) / 1000);
+                            stopDuration = `${stopHours.toString().padStart(2, '0')}:${stopMinutes.toString().padStart(2, '0')}:${stopSeconds.toString().padStart(2, '0')}`;
+                        }
+                    }
+                    
+                    allRecords.push({
+                        warehouse: warehouse,
+                        machine: machine.name,
+                        status: machine.status,
+                        itemType: machine.itemType,
+                        color: machine.color,
+                        size: machine.size,
+                        quantity: machine.quantity,
+                        startDate: machine.startDate || '-',
+                        productionTime: productionTime,
+                        stopDuration: stopDuration,
+                        stopReason: machine.stopReason,
+                        completedAt: '-',
+                        isHistory: false
+                    });
+                }
+            });
+            
+            // Add completed jobs from history
+            if (productionHistory[warehouse]) {
+                productionHistory[warehouse].forEach(job => {
+                    allRecords.push({
+                        warehouse: warehouse,
+                        machine: job.machine,
+                        status: 'completed',
+                        itemType: job.itemType,
+                        color: job.color,
+                        size: job.size,
+                        quantity: job.quantity,
+                        startDate: job.startDate || '-',
+                        productionTime: job.productionTime,
+                        stopDuration: job.stopDuration || '-',
+                        stopReason: '-',
+                        completedAt: job.completedAt,
+                        isHistory: true,
+                        timestamp: job.timestamp
+                    });
+                });
+            }
+            
+            // Sort by timestamp (newest first for history items)
+            allRecords.sort((a, b) => {
+                if (a.isHistory && b.isHistory) {
+                    return b.timestamp - a.timestamp;
+                }
+                if (a.isHistory) return 1;
+                if (b.isHistory) return -1;
+                return 0;
+            });
+
+            // Filter records
+            let filteredRecords = allRecords;
+            if (filterValue !== 'all') {
+                filteredRecords = allRecords.filter(r => r.status === filterValue);
+            }
+
+            if (filteredRecords.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="12" class="no-data">No data available</td></tr>';
+                return;
+            }
+
+            filteredRecords.forEach(record => {
+                const row = document.createElement('tr');
+                
+                row.innerHTML = `
+                    <td>Warehouse ${record.warehouse}</td>
+                    <td>${record.machine}</td>
+                    <td class="status-cell ${record.status}">${record.status.toUpperCase()}</td>
+                    <td>${record.itemType || '-'}</td>
+                    <td>${record.color || '-'}</td>
+                    <td>${record.size || '-'}</td>
+                    <td>${record.quantity || '-'}</td>
+                    <td style="font-size: 0.85em;">${record.startDate}</td>
+                    <td>${record.productionTime}</td>
+                    <td>${record.stopDuration}</td>
+                    <td>${record.stopReason || '-'}</td>
+                    <td>${record.completedAt}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // Filter reports
+        function filterReports(warehouse) {
+            updateReportsTable(warehouse);
+        }
+
+        // Export to Excel (CSV format)
+        function exportToExcel(warehouse) {
+            let csv = [];
+            
+            // Add title with warehouse name
+            csv.push(['Production Report - Warehouse ' + warehouse]);
+            csv.push(['Export Date: ' + new Date().toLocaleString()]);
+            csv.push([]);
+
+            // Headers - Add Completed At column
+            const headers = ['Warehouse', 'Machine', 'Status', 'Product Type', 'Color', 'Size (OD)', 'Quantity', 'Production Time', 'Stop Reason', 'Completed At'];
+            csv.push(headers);
+
+            let allRecords = [];
+            
+            // Add current machine states (running, stopped)
+            machines[warehouse].forEach(machine => {
+                if (machine.status === 'running' || machine.status === 'stopped') {
+                    let productionTime = '-';
+                    if (machine.status === 'running') {
+                        const currentSessionTime = Date.now() - machine.startTime;
+                        const totalElapsed = (machine.savedElapsedTime || 0) + currentSessionTime;
+                        const hours = Math.floor(totalElapsed / 3600000);
+                        const minutes = Math.floor((totalElapsed % 3600000) / 60000);
+                        const seconds = Math.floor((totalElapsed % 60000) / 1000);
+                        productionTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                    } else if (machine.status === 'stopped' && machine.savedElapsedTime) {
+                        const elapsed = machine.savedElapsedTime;
+                        const hours = Math.floor(elapsed / 3600000);
+                        const minutes = Math.floor((elapsed % 3600000) / 60000);
+                        const seconds = Math.floor((elapsed % 60000) / 1000);
+                        productionTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                    }
+
+                    allRecords.push([
+                        'Warehouse ' + warehouse,
+                        machine.name,
+                        machine.status.toUpperCase(),
+                        machine.itemType || '-',
+                        machine.color || '-',
+                        machine.size || '-',
+                        machine.quantity || '-',
+                        productionTime,
+                        machine.stopReason || '-',
+                        '-'
+                    ]);
+                }
+            });
+            
+            // Add completed jobs from history
+            if (productionHistory[warehouse]) {
+                productionHistory[warehouse].forEach(job => {
+                    allRecords.push([
+                        'Warehouse ' + warehouse,
+                        job.machine,
+                        'COMPLETED',
+                        job.itemType || '-',
+                        job.color || '-',
+                        job.size || '-',
+                        job.quantity || '-',
+                        job.productionTime,
+                        '-',
+                        job.completedAt
+                    ]);
+                });
+            }
+
+            // Add all records to CSV
+            allRecords.forEach(record => {
+                csv.push(record);
+            });
+
+            // Convert to CSV string
+            let csvContent = csv.map(row => row.join(',')).join('\n');
+
+            // Download with warehouse in filename
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `Production_Report_Warehouse_${warehouse}_${new Date().toISOString().split('T')[0]}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            const totalRecords = allRecords.length;
+            const completedCount = productionHistory[warehouse] ? productionHistory[warehouse].length : 0;
+            alert(`✅ Export completed!\n\nTotal Records: ${totalRecords}\nCompleted Jobs: ${completedCount}\nCurrent Running/Stopped: ${totalRecords - completedCount}`);
+        }
+
+        // Confirm clear data
+        function confirmClearData(warehouse) {
+            if (confirm('⚠️ WARNING: This will delete all production data for Warehouse ' + warehouse + '.\n\nAre you sure you want to continue?')) {
+                if (confirm('This action cannot be undone. Click OK to confirm deletion.')) {
+                    clearWarehouseData(warehouse);
+                }
+            }
+        }
+
+        // Clear warehouse data
+        function clearWarehouseData(warehouse) {
+            machines[warehouse].forEach((machine, index) => {
+                machines[warehouse][index] = {
+                    id: machine.id,
+                    warehouse: machine.warehouse,
+                    name: machine.name,
+                    status: 'idle',
+                    item: null,
+                    itemType: null,
+                    color: null,
+                    quantity: null,
+                    size: null,
+                    stopReason: null,
+                    startTime: null,
+                    actualStartTime: null,
+                    startDate: null,
+                    savedElapsedTime: 0,
+                    stopTime: null,
+                    stopDate: null,
+                    stopDuration: 0,
+                    timerInterval: null
+                };
+            });
+            
+            // Clear production history
+            productionHistory[warehouse] = [];
+            
+            // Clear localStorage
+            localStorage.removeItem(`warehouse${warehouse}`);
+            localStorage.removeItem(`productionHistory${warehouse}`);
+            
+            // Reset filter to "All"
+            document.getElementById(`filterStatus${warehouse}`).value = 'all';
+            
+            // Update the table display
+            updateReportsTable(warehouse);
+            
+            alert('✅ All data and production history for Warehouse ' + warehouse + ' has been cleared.');
+        }
+
+        // Initialize on load
+        initializeMachines();
+
+        // Helper function to save warehouse data
+        function saveWarehouseData(warehouse) {
+            const saveData = machines[warehouse].map(m => {
+                let currentSavedTime = m.savedElapsedTime || 0;
+                
+                // Calculate current elapsed time for running machines
+                if (m.status === 'running' && m.startTime) {
+                    const currentSessionTime = Date.now() - m.startTime;
+                    currentSavedTime = (m.savedElapsedTime || 0) + currentSessionTime;
+                }
+                
+                return {
+                    id: m.id,
+                    warehouse: m.warehouse,
+                    status: m.status,
+                    item: m.item,
+                    itemType: m.itemType,
+                    color: m.color,
+                    quantity: m.quantity,
+                    size: m.size,
+                    stopReason: m.stopReason,
+                    startTime: Date.now(), // Save current time as reference
+                    actualStartTime: m.actualStartTime,
+                    startDate: m.startDate,
+                    savedElapsedTime: currentSavedTime,
+                    stopTime: m.stopTime,
+                    stopDate: m.stopDate,
+                    stopDuration: m.stopDuration
+                };
+            });
+            localStorage.setItem(`warehouse${warehouse}`, JSON.stringify(saveData));
+        }
+
+        // Save state to localStorage periodically
+        setInterval(() => {
+            // Save all warehouses, not just the current one
+            for (let w = 1; w <= 3; w++) {
+                const saveData = machines[w].map(m => {
+                    let currentSavedTime = m.savedElapsedTime || 0;
+                    
+                    // Only update savedElapsedTime for running machines
+                    if (m.status === 'running' && m.startTime) {
+                        const currentSessionTime = Date.now() - m.startTime;
+                        currentSavedTime = (m.savedElapsedTime || 0) + currentSessionTime;
+                    }
+                    
+                    return {
+                        id: m.id,
+                        warehouse: m.warehouse,
+                        status: m.status,
+                        item: m.item,
+                        itemType: m.itemType,
+                        color: m.color,
+                        quantity: m.quantity,
+                        size: m.size,
+                        stopReason: m.stopReason,
+                        startTime: Date.now(), // Always save current time as reference
+                        actualStartTime: m.actualStartTime,
+                        savedElapsedTime: currentSavedTime,
+                        stopTime: m.stopTime
+                    };
+                });
+                localStorage.setItem(`warehouse${w}`, JSON.stringify(saveData));
+            }
+        }, 2000); // Save every 2 seconds
+
+        // Load saved state on startup
+        window.addEventListener('load', () => {
+            for (let w = 1; w <= 3; w++) {
+                // Load machine states
+                const saved = localStorage.getItem(`warehouse${w}`);
+                if (saved) {
+                    try {
+                        const data = JSON.parse(saved);
+                        data.forEach((savedMachine, index) => {
+                            if (machines[w][index]) {
+                                // Restore all saved properties
+                                machines[w][index].status = savedMachine.status;
+                                machines[w][index].item = savedMachine.item;
+                                machines[w][index].itemType = savedMachine.itemType;
+                                machines[w][index].color = savedMachine.color;
+                                machines[w][index].quantity = savedMachine.quantity;
+                                machines[w][index].size = savedMachine.size;
+                                machines[w][index].stopReason = savedMachine.stopReason;
+                                machines[w][index].actualStartTime = savedMachine.actualStartTime;
+                                machines[w][index].startDate = savedMachine.startDate;
+                                machines[w][index].savedElapsedTime = savedMachine.savedElapsedTime || 0;
+                                machines[w][index].stopTime = savedMachine.stopTime;
+                                machines[w][index].stopDate = savedMachine.stopDate;
+                                machines[w][index].stopDuration = savedMachine.stopDuration || 0;
+                                
+                                if (savedMachine.status === 'running') {
+                                    // Machine was running before refresh/close
+                                    // Set startTime to NOW (so current session starts fresh)
+                                    machines[w][index].startTime = Date.now();
+                                    // savedElapsedTime already contains all time up to browser close
+                                } else if (savedMachine.status === 'stopped') {
+                                    // Machine is stopped - keep saved elapsed time as is
+                                    machines[w][index].startTime = savedMachine.startTime;
+                                }
+                            }
+                        });
+                        console.log(`Loaded data for Warehouse ${w}`);
+                    } catch (e) {
+                        console.error('Error loading saved data for warehouse ' + w + ':', e);
+                    }
+                }
+                
+                // Load production history
+                const history = localStorage.getItem(`productionHistory${w}`);
+                if (history) {
+                    try {
+                        productionHistory[w] = JSON.parse(history);
+                        console.log(`Loaded production history for Warehouse ${w}: ${productionHistory[w].length} completed jobs`);
+                    } catch (e) {
+                        console.error('Error loading production history for warehouse ' + w + ':', e);
+                        productionHistory[w] = [];
+                    }
+                } else {
+                    productionHistory[w] = [];
+                }
+            }
+        });
+
+        // Save data before browser closes or page unloads
+        window.addEventListener('beforeunload', () => {
+            for (let w = 1; w <= 3; w++) {
+                machines[w].forEach((machine) => {
+                    if (machine.status === 'running' && machine.startTime) {
+                        const currentSessionTime = Date.now() - machine.startTime;
+                        machine.savedElapsedTime = (machine.savedElapsedTime || 0) + currentSessionTime;
+                        machine.startTime = Date.now();
+                    }
+                });
+                
+                const saveData = machines[w].map(m => ({
+                    id: m.id,
+                    warehouse: m.warehouse,
+                    status: m.status,
+                    item: m.item,
+                    itemType: m.itemType,
+                    color: m.color,
+                    quantity: m.quantity,
+                    size: m.size,
+                    stopReason: m.stopReason,
+                    startTime: m.startTime,
+                    actualStartTime: m.actualStartTime,
+                    savedElapsedTime: m.savedElapsedTime,
+                    stopTime: m.stopTime
+                }));
+                localStorage.setItem(`warehouse${w}`, JSON.stringify(saveData));
+            }
+        });
+    </script>
+</body>
+</html>
